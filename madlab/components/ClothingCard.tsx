@@ -1,15 +1,16 @@
+import React, { useState, useEffect } from 'react';
 import { StyleSheet, Image, View, Dimensions, Pressable, TouchableOpacity } from 'react-native';
-import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { ThemedText } from '@/components/ThemedText';
 import * as Haptics from 'expo-haptics';
 import Toast from 'react-native-toast-message';
 import Animated, { 
+  useSharedValue,
   withSpring,
+  withSequence,
   useAnimatedStyle,
-  withTiming,
-  useSharedValue
+  withTiming
 } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
@@ -24,8 +25,8 @@ type Outfit = {
 
 export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }: Outfit) {
   const [isLiked, setIsLiked] = useState(false);
-  const scale = useSharedValue(1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const scale = useSharedValue(1);
 
   useEffect(() => {
     checkIfLiked();
@@ -67,7 +68,12 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
     
     // Optimistically update UI
     setIsLiked(prev => !prev);
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    scale.value = withSequence(
+      withSpring(1.2),
+      withSpring(1)
+    );
+    await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -77,11 +83,28 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
           position: 'bottom',
           bottomOffset: 80,
         });
+        setIsLiked(false); // Revert optimistic update
         return;
       }
 
       const wasLiked = isLiked;
-      if (wasLiked) {
+      if (!wasLiked) {
+        const { error } = await supabase
+          .from('wishlist')
+          .insert([
+            { user_id: user.id, outfit_id },
+          ]);
+
+        if (error) throw error;
+
+        Toast.show({
+          type: 'success',
+          text1: 'Added to wishlist',
+          position: 'bottom',
+          bottomOffset: 80,
+        });
+        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } else {
         const { error } = await supabase
           .from('wishlist')
           .delete()
@@ -90,50 +113,29 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
 
         if (error) throw error;
 
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         Toast.show({
           type: 'success',
           text1: 'Removed from wishlist',
           position: 'bottom',
           bottomOffset: 80,
         });
-      } else {
-        const { error } = await supabase
-          .from('wishlist')
-          .insert([
-            {
-              user_id: user.id,
-              outfit_id: outfit_id,
-            },
-          ]);
-
-        if (error) throw error;
-
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        Toast.show({
-          type: 'success',
-          text1: 'Added to wishlist',
-          position: 'bottom',
-          bottomOffset: 80,
-        });
       }
-
-      // UI is already updated
-      setIsProcessing(false);
+      
       if (onWishlistUpdate) {
         onWishlistUpdate();
       }
     } catch (error) {
+      console.error('Error toggling like:', error);
       // Revert optimistic update on error
       setIsLiked(prev => !prev);
-      setIsProcessing(false);
-      console.error('Error updating wishlist:', error);
       Toast.show({
         type: 'error',
-        text1: 'Error updating wishlist',
+        text1: 'Failed to update wishlist',
         position: 'bottom',
         bottomOffset: 80,
       });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -145,79 +147,71 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
 
   return (
     <View style={styles.card}>
+      <View style={styles.header}>
+        <ThemedText style={styles.productTitle} numberOfLines={1}>{name}</ThemedText>
+        <ThemedText style={styles.productPrice}>₹{price.toFixed(2)}</ThemedText>
+      </View>
       <Image source={{ uri: image }} style={styles.image} />
-      <View style={styles.overlay}>
-        <View style={styles.productInfo}>
-          <ThemedText style={styles.productTitle} numberOfLines={1}>{name}</ThemedText>
-          <ThemedText style={styles.productPrice}>${price.toFixed(2)}</ThemedText>
-        </View>
-        <Animated.View style={[styles.buttonContainer, animatedStyle]}>
+      <Animated.View style={[styles.buttonContainer, animatedStyle]}>
         <TouchableOpacity 
           style={styles.likeButton}
           onPress={toggleLike}
           disabled={isProcessing}
         >
-          <ThemedText style={styles.buttonText}>Wishlist</ThemedText>
+          <IconSymbol name={isLiked ? "heart.fill" : "heart"} size={24} color={isLiked ? "#FF3B30" : "#000000"} />
         </TouchableOpacity>
       </Animated.View>
-      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
-    paddingBottom: 20,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+  header: {
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 16,
+    backgroundColor: '#FFFFFF',
   },
-  productInfo: {
-    marginBottom: 16,
-  },
-  productTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    marginBottom: 4,
-    color: '#FFFFFF',
-  },
-  productPrice: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#FFFFFF',
-  },
+
   card: {
     width: width * 0.9,
-    height: width * 1.2,
     borderRadius: 20,
-    backgroundColor: '#1A1A1A',
+    backgroundColor: '#FFFFFF',
     overflow: 'hidden',
+    marginBottom: 20,
   },
   image: {
     width: '100%',
-    height: '100%',
+    height: width,
     resizeMode: 'cover',
   },
   buttonContainer: {
     position: 'absolute',
-    right: 16,
-    bottom: 16,
+    right: 20,
+    bottom: 20,
   },
-  buttonText: {
-    fontSize: 14,
+  productTitle: {
+    fontSize: 24,
     fontWeight: '600',
-    color: '#FFFFFF',
+    color: '#000000',
+    marginBottom: 8,
+  },
+  productPrice: {
+    fontSize: 18,
+    fontWeight: '500',
+    color: '#000000',
   },
   likeButton: {
-    backgroundColor: 'rgba(255, 55, 95, 0.9)',
-    paddingVertical: 10,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    alignSelf: 'flex-end',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
 }); 

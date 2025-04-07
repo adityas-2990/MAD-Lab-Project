@@ -162,18 +162,18 @@ export default function WishlistScreen() {
                   transform: [{ scale: pressed ? 0.98 : 1 }],
                   width: '100%',
                 }]}
-                onLongPress={() => handleRemove(item.outfit_id)}
               >
-                <View style={styles.card}>
-                  <Image source={{ uri: item.outfits.image }} style={styles.cardImage} />
-                  <View style={styles.cardOverlay}>
-                    <TouchableOpacity 
-                      style={styles.removeButton}
-                      onPress={() => handleRemove(item.outfit_id)}
-                    >
-                      <ThemedText style={styles.removeButtonText}>Remove</ThemedText>
-                    </TouchableOpacity>
-                  </View>
+                <Image 
+                  source={{ uri: item.outfits.image }} 
+                  style={styles.cardImage} 
+                />
+                <View style={styles.cardOverlay}>
+                  <TouchableOpacity 
+                    style={styles.removeButton} 
+                    onPress={() => handleRemove(item.outfit_id)}
+                  >
+                    <ThemedText style={styles.removeButtonText}>Remove</ThemedText>
+                  </TouchableOpacity>
                 </View>
               </Pressable>
             )}
@@ -189,20 +189,18 @@ export default function WishlistScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
-    paddingTop: 20,
+    backgroundColor: '#fff',
   },
   header: {
-    padding: 24,
     paddingTop: 60,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.1)',
-    marginBottom: 20,
+    paddingBottom: 20,
+    paddingHorizontal: 20,
+    backgroundColor: '#fff',
   },
   title: {
-    fontSize: 34,
-    marginBottom: 8,
-    fontWeight: '700',
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#000',
   },
   subtitle: {
     fontSize: 16,
