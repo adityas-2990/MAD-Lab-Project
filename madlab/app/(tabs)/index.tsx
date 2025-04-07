@@ -1,9 +1,12 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Dimensions, Image, ActivityIndicator, View } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { StyleSheet, Dimensions, ActivityIndicator, View } from 'react-native';
 import Swiper from 'react-native-deck-swiper';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { supabase } from '@/lib/supabase';
+import { useNavigation, ParamListBase } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
+import { ClothingCard } from '@/components/ClothingCard';
 
 const { width } = Dimensions.get('window');
 
@@ -13,6 +16,7 @@ type Outfit = {
 };
 
 export default function HomeScreen() {
+  const navigation = useNavigation<NavigationProp<ParamListBase & { params: { refresh?: number } }>>();
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -27,7 +31,7 @@ export default function HomeScreen() {
         .from('outfits')
         .select('outfit_id, image');
 
-      console.log('Supabase response:', { data: outfits, error }); // More detailed debug log
+      console.log('Supabase response:', { data: outfits, error });
 
       if (error) {
         console.error('Supabase error:', error);
@@ -40,7 +44,7 @@ export default function HomeScreen() {
         return;
       }
 
-      console.log('Setting outfits:', outfits); // Log the outfits being set
+      console.log('Setting outfits:', outfits);
       setOutfits(outfits);
     } catch (error) {
       console.error('Error loading outfits:', error);
@@ -72,9 +76,14 @@ export default function HomeScreen() {
         renderCard={(outfit) => {
           if (!outfit) return null;
           return (
-            <View style={styles.card}>
-              <Image source={{ uri: outfit.image }} style={styles.image} />
-            </View>
+            <ClothingCard
+              outfit_id={outfit.outfit_id}
+              image={outfit.image}
+              onWishlistUpdate={() => {
+                // Force a refresh of the wishlist screen when it becomes focused next time
+                navigation.setParams({ refresh: Date.now() });
+              }}
+            />
           );
         }}
         onSwipedLeft={(cardIndex) => {
@@ -105,26 +114,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#000000',
     justifyContent: 'center',
-  },
-  card: {
-    width: width * 0.9,
-    height: width * 1.2,
-    borderRadius: 20,
-    backgroundColor: '#1A1A1A',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
   },
   text: {
     fontSize: 16,
