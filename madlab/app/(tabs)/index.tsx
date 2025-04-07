@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Dimensions, ActivityIndicator, View } from 'react-native';
+import { StyleSheet, Dimensions, ActivityIndicator, View, StatusBar } from 'react-native';
 import Swiper from 'react-native-deck-swiper';
 import { ThemedView } from '@/components/ThemedView';
+import { FilterBar } from '@/components/FilterBar';
 import { ThemedText } from '@/components/ThemedText';
 import { supabase } from '@/lib/supabase';
 import { useNavigation, ParamListBase } from '@react-navigation/native';
@@ -13,9 +14,12 @@ const { width } = Dimensions.get('window');
 type Outfit = {
   outfit_id: string;
   image: string;
+  name: string;
+  price: number;
 };
 
 export default function HomeScreen() {
+  const [visibleIndex, setVisibleIndex] = useState(0);
   const navigation = useNavigation<NavigationProp<ParamListBase & { params: { refresh?: number } }>>();
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [loading, setLoading] = useState(true);
@@ -29,7 +33,7 @@ export default function HomeScreen() {
       console.log('Starting to fetch outfits...');
       let { data: outfits, error } = await supabase
         .from('outfits')
-        .select('outfit_id, image');
+        .select('outfit_id, image, name, price');
 
       console.log('Supabase response:', { data: outfits, error });
 
@@ -71,39 +75,49 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
+      <StatusBar barStyle="light-content" />
+      <View style={styles.header}>
+        <FilterBar />
+      </View>
       <Swiper
         cards={outfits}
-        renderCard={(outfit) => {
+        renderCard={(outfit, cardIndex) => {
           if (!outfit) return null;
+          
+          // Only render cards that are within 2 indices of the visible card
+          if (Math.abs(cardIndex - visibleIndex) > 2) {
+            return <View style={styles.placeholderCard} />;
+          }
+
           return (
             <ClothingCard
+              key={outfit.outfit_id}
               outfit_id={outfit.outfit_id}
               image={outfit.image}
-              onWishlistUpdate={() => {
-                // Force a refresh of the wishlist screen when it becomes focused next time
-                navigation.setParams({ refresh: Date.now() });
-              }}
+              name={outfit.name}
+              price={outfit.price}
+              onWishlistUpdate={() => navigation.setParams({ refresh: Date.now() })}
             />
           );
         }}
-        onSwipedLeft={(cardIndex) => {
-          console.log('Swiped left:', cardIndex);
-        }}
-        onSwipedRight={(cardIndex) => {
-          console.log('Swiped right:', cardIndex);
-        }}
+        onSwipedLeft={cardIndex => setVisibleIndex(cardIndex + 1)}
+        onSwipedRight={cardIndex => setVisibleIndex(cardIndex + 1)}
         onSwipedAll={() => {
-          console.log('All outfits swiped');
+          setVisibleIndex(0);
           loadOutfits();
         }}
-        cardIndex={0}
         backgroundColor="#000000"
-        stackSize={3}
+        cardIndex={0}
+        stackSize={2}
         stackSeparation={15}
         animateCardOpacity
         verticalSwipe={false}
         cardVerticalMargin={80}
         cardHorizontalMargin={20}
+        disableTopSwipe
+        disableBottomSwipe
+        outputRotationRange={["-8deg", "0deg", "8deg"]}
+        useViewOverflow={false}
       />
     </ThemedView>
   );
@@ -113,7 +127,15 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#000000',
-    justifyContent: 'center',
+  },
+  header: {
+    paddingTop: 60,
+    marginBottom: 20,
+  },
+  placeholderCard: {
+    width: width * 0.9,
+    height: width * 1.2,
+    backgroundColor: 'transparent',
   },
   text: {
     fontSize: 16,

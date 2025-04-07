@@ -19,8 +19,16 @@ type WishlistItem = {
   outfits: {
     image: string;
     outfit_id: string;
-  };
+  } | null;
 };
+
+type WishlistResponse = {
+  outfit_id: string;
+  outfits: {
+    image: string;
+    outfit_id: string;
+  } | null;
+}[];
 
 export default function WishlistScreen() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
@@ -147,26 +155,28 @@ export default function WishlistScreen() {
             exiting={FadeOutLeft.duration(200)}
             style={styles.cardContainer}
           >
-            <Pressable 
-              style={({ pressed }) => [{
-                opacity: pressed ? 0.9 : 1,
-                transform: [{ scale: pressed ? 0.98 : 1 }],
-                width: '100%',
-              }]}
-              onLongPress={() => handleRemove(item.outfit_id)}
-            >
-              <View style={styles.card}>
-                <Image source={{ uri: item.outfits.image }} style={styles.cardImage} />
-                <View style={styles.cardOverlay}>
-                  <TouchableOpacity 
-                    style={styles.removeButton}
-                    onPress={() => handleRemove(item.outfit_id)}
-                  >
-                    <ThemedText style={styles.removeButtonText}>Remove</ThemedText>
-                  </TouchableOpacity>
+            {item.outfits && (
+              <Pressable 
+                style={({ pressed }) => [{
+                  opacity: pressed ? 0.9 : 1,
+                  transform: [{ scale: pressed ? 0.98 : 1 }],
+                  width: '100%',
+                }]}
+                onLongPress={() => handleRemove(item.outfit_id)}
+              >
+                <View style={styles.card}>
+                  <Image source={{ uri: item.outfits.image }} style={styles.cardImage} />
+                  <View style={styles.cardOverlay}>
+                    <TouchableOpacity 
+                      style={styles.removeButton}
+                      onPress={() => handleRemove(item.outfit_id)}
+                    >
+                      <ThemedText style={styles.removeButtonText}>Remove</ThemedText>
+                    </TouchableOpacity>
+                  </View>
                 </View>
-              </View>
-            </Pressable>
+              </Pressable>
+            )}
           </Animated.View>
         )}
         contentContainerStyle={styles.listContent}
