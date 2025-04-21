@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StyleSheet, Dimensions, ActivityIndicator, View, StatusBar } from 'react-native';
+import { StyleSheet, Dimensions, ActivityIndicator, View, StatusBar, TouchableOpacity } from 'react-native';
 import Swiper from 'react-native-deck-swiper';
 import { ThemedView } from '@/components/ThemedView';
 import { FilterBar } from '@/components/FilterBar';
@@ -12,29 +12,125 @@ import { ClothingCard } from '@/components/ClothingCard';
 const { width } = Dimensions.get('window');
 
 type Outfit = {
-  outfit_id: string;
-  image: string;
+  id: string;
   name: string;
   price: number;
   gender: 'Men' | 'Women' | 'Unisex';
+  category: 'Shirt' | 'T-Shirt' | 'Pants' | 'Jeans' | 'Dress' | 'Jacket' | 'Sweater' | 'Skirt' | 'Shorts' | 'Hoodie';
+  color: 'Black' | 'White' | 'Red' | 'Blue' | 'Green' | 'Yellow' | 'Purple' | 'Pink';
+  imageUrl: string;
 };
+
+type PriceFilter = 'Under ₹1000' | '₹1000-₹2000' | '₹2000-₹4000' | '₹4000-₹6000' | '₹6000-₹8000' | 'Over ₹8000';
+type CategoryFilter = 'Shirt' | 'T-Shirt' | 'Pants' | 'Jeans' | 'Dress' | 'Jacket' | 'Sweater' | 'Skirt' | 'Shorts' | 'Hoodie';
+type ColorFilter = 'Black' | 'White' | 'Red' | 'Blue' | 'Green' | 'Yellow' | 'Purple' | 'Pink';
 
 export default function HomeScreen() {
   const [visibleIndex, setVisibleIndex] = useState(0);
   const navigation = useNavigation<NavigationProp<ParamListBase & { params: { refresh?: number } }>>();
   const [outfits, setOutfits] = useState<Outfit[]>([]);
   const [filteredOutfits, setFilteredOutfits] = useState<Outfit[]>([]);
-  const [selectedGenders, setSelectedGenders] = useState<string[]>([]);
+  const [selectedGenders, setSelectedGenders] = useState<('Men' | 'Women' | 'Unisex')[]>([]);
+  const [selectedPrices, setSelectedPrices] = useState<PriceFilter[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<CategoryFilter[]>([]);
+  const [selectedColors, setSelectedColors] = useState<ColorFilter[]>([]);
   const [loading, setLoading] = useState(true);
+  const [allOutfitsSwiped, setAllOutfitsSwiped] = useState(false);
 
-  const handleGenderFilter = (genders: string[]) => {
+  const resetAndReload = () => {
+    console.log('Resetting all filters and reloading outfits');
+    // Clear all filter states
+    setSelectedGenders([]);
+    setSelectedPrices([]);
+    setSelectedCategories([]);
+    setSelectedColors([]);
+    
+    // Set loading state to true to show loading indicator
+    setLoading(true);
+    
+    // Reset the visible index to 0 to start from the first card
+    setVisibleIndex(0);
+    
+    // Reload outfits from the database
+    loadOutfits();
+  };
+
+  const handleGenderFilter = (genders: ('Men' | 'Women' | 'Unisex')[]) => {
     setSelectedGenders(genders);
-    if (genders.length === 0) {
-      setFilteredOutfits(outfits);
-    } else {
-      const filtered = outfits.filter(outfit => genders.includes(outfit.gender));
-      setFilteredOutfits(filtered);
+    applyFilters(genders, selectedPrices, selectedCategories, selectedColors);
+  };
+
+  const handlePriceFilter = (prices: PriceFilter[]) => {
+    setSelectedPrices(prices);
+    applyFilters(selectedGenders, prices, selectedCategories, selectedColors);
+  };
+
+  const handleCategoryFilter = (categories: CategoryFilter[]) => {
+    setSelectedCategories(categories);
+    applyFilters(selectedGenders, selectedPrices, categories, selectedColors);
+  };
+
+  const handleColorFilter = (colors: ColorFilter[]) => {
+    setSelectedColors(colors);
+    applyFilters(selectedGenders, selectedPrices, selectedCategories, colors);
+  };
+
+  const applyFilters = (
+    genders: ('Men' | 'Women' | 'Unisex')[],
+    prices: PriceFilter[],
+    categories: CategoryFilter[],
+    colors: ColorFilter[]
+  ) => {
+    // If all filters are empty, show all outfits
+    if (genders.length === 0 && prices.length === 0 && categories.length === 0 && colors.length === 0) {
+      console.log('All filters cleared, showing all outfits');
+      setFilteredOutfits([...outfits]);
+      return;
     }
+
+    let filtered = [...outfits];
+
+    // Apply gender filter
+    if (genders.length > 0) {
+      filtered = filtered.filter((outfit) => genders.includes(outfit.gender));
+    }
+
+    // Apply price filter
+    if (prices.length > 0) {
+      filtered = filtered.filter((outfit) => {
+        return prices.some((price) => {
+          switch (price) {
+            case 'Under ₹1000':
+              return outfit.price < 1000;
+            case '₹1000-₹2000':
+              return outfit.price >= 1000 && outfit.price <= 2000;
+            case '₹2000-₹4000':
+              return outfit.price > 2000 && outfit.price <= 4000;
+            case '₹4000-₹6000':
+              return outfit.price > 4000 && outfit.price <= 6000;
+            case '₹6000-₹8000':
+              return outfit.price > 6000 && outfit.price <= 8000;
+            case 'Over ₹8000':
+              return outfit.price > 8000;
+            default:
+              return false;
+          }
+        });
+      });
+    }
+
+    // Apply category filter
+    if (categories.length > 0) {
+      filtered = filtered.filter((outfit) => categories.includes(outfit.category));
+    }
+
+    // Apply color filter
+    if (colors.length > 0) {
+      filtered = filtered.filter((outfit) => colors.includes(outfit.color));
+    }
+
+    console.log('Filtered outfits:', filtered.length);
+    setFilteredOutfits(filtered);
   };
 
   useEffect(() => {
@@ -46,7 +142,7 @@ export default function HomeScreen() {
       console.log('Starting to fetch outfits...');
       let { data: outfits, error } = await supabase
         .from('outfits')
-        .select('outfit_id, image, name, price, gender');
+        .select('outfit_id, image, name, price, gender, category, color');
 
       console.log('Supabase response:', { data: outfits, error });
 
@@ -58,12 +154,24 @@ export default function HomeScreen() {
       if (!outfits || outfits.length === 0) {
         console.log('No outfits found in database');
         setOutfits([]);
+        setFilteredOutfits([]);
         return;
       }
 
-      console.log('Setting outfits:', outfits);
-      setOutfits(outfits);
-      setFilteredOutfits(outfits);
+      // Transform the data to match our Outfit type
+      const transformedOutfits: Outfit[] = outfits.map(outfit => ({
+        id: outfit.outfit_id,
+        imageUrl: outfit.image,
+        name: outfit.name,
+        price: outfit.price,
+        gender: outfit.gender,
+        category: outfit.category,
+        color: outfit.color
+      }));
+
+      console.log('Setting outfits:', transformedOutfits);
+      setOutfits(transformedOutfits);
+      setFilteredOutfits(transformedOutfits);
     } catch (error) {
       console.error('Error loading outfits:', error);
     } finally {
@@ -91,50 +199,80 @@ export default function HomeScreen() {
     <ThemedView style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={styles.header}>
-        <FilterBar onGenderFilter={handleGenderFilter} />
+        <FilterBar 
+          onGenderFilter={handleGenderFilter}
+          onPriceFilter={handlePriceFilter}
+          onCategoryFilter={handleCategoryFilter}
+          onColorFilter={handleColorFilter}
+          resetAndReload={resetAndReload}
+        />
       </View>
       <View style={styles.swiperContainer}>
-        <Swiper
-          cards={filteredOutfits}
-          renderCard={(outfit, cardIndex) => {
-            if (!outfit) {
+        {filteredOutfits.length === 0 ? (
+          <View style={styles.noOutfitsContainer}>
+            <ThemedText style={styles.noOutfitsText}>No outfits found matching your filters</ThemedText>
+            <TouchableOpacity 
+              style={styles.resetButton}
+              onPress={resetAndReload}
+            >
+              <ThemedText style={styles.resetButtonText}>Reset Filters</ThemedText>
+            </TouchableOpacity>
+          </View>
+        ) : allOutfitsSwiped ? (
+          <View style={styles.noOutfitsContainer}>
+            <ThemedText style={styles.noOutfitsText}>No more outfits left</ThemedText>
+            <TouchableOpacity 
+              style={styles.resetButton}
+              onPress={() => {
+                setAllOutfitsSwiped(false);
+                setVisibleIndex(0);
+              }}
+            >
+              <ThemedText style={styles.resetButtonText}>Start Over</ThemedText>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Swiper
+            cards={filteredOutfits}
+            renderCard={(outfit, cardIndex) => {
+              if (!outfit) {
+                return (
+                  <View style={styles.placeholderCard}>
+                    <ActivityIndicator size="large" color="#000000" />
+                  </View>
+                );
+              }
               return (
-                <View style={styles.placeholderCard}>
-                  <ActivityIndicator size="large" color="#000000" />
-                </View>
+                <ClothingCard
+                  key={outfit.id}
+                  outfit_id={outfit.id}
+                  image={outfit.imageUrl}
+                  name={outfit.name}
+                  price={outfit.price}
+                  onWishlistUpdate={() => navigation.setParams({ refresh: Date.now() })}
+                />
               );
-            }
-            return (
-              <ClothingCard
-                key={outfit.outfit_id}
-                outfit_id={outfit.outfit_id}
-                image={outfit.image}
-                name={outfit.name}
-                price={outfit.price}
-                onWishlistUpdate={() => navigation.setParams({ refresh: Date.now() })}
-              />
-            );
-          }}
-          onSwipedLeft={(cardIndex) => setVisibleIndex(cardIndex + 1)}
-          onSwipedRight={(cardIndex) => setVisibleIndex(cardIndex + 1)}
-          onSwipedAll={() => {
-            setVisibleIndex(0);
-            loadOutfits();
-          }}
-          cardIndex={0}
-          backgroundColor="transparent"
-          stackSize={2}
-          containerStyle={styles.swiperContent}
-          stackSeparation={15}
-          animateCardOpacity
-          verticalSwipe={false}
-          cardVerticalMargin={80}
-          cardHorizontalMargin={20}
-          disableTopSwipe
-          disableBottomSwipe
-          outputRotationRange={["-8deg", "0deg", "8deg"]}
-          useViewOverflow={false}
-        />
+            }}
+            onSwipedLeft={(cardIndex) => setVisibleIndex(cardIndex + 1)}
+            onSwipedRight={(cardIndex) => setVisibleIndex(cardIndex + 1)}
+            onSwipedAll={() => {
+              setAllOutfitsSwiped(true);
+            }}
+            cardIndex={0}
+            backgroundColor="transparent"
+            stackSize={2}
+            containerStyle={styles.swiperContent}
+            stackSeparation={15}
+            animateCardOpacity
+            verticalSwipe={false}
+            cardVerticalMargin={80}
+            cardHorizontalMargin={20}
+            disableTopSwipe
+            disableBottomSwipe
+            outputRotationRange={["-8deg", "0deg", "8deg"]}
+            useViewOverflow={false}
+          />
+        )}
       </View>
     </ThemedView>
   );
@@ -166,5 +304,27 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#FFFFFF',
     textAlign: 'center',
+  },
+  noOutfitsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  noOutfitsText: {
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 20,
+    color: '#FFFFFF',
+  },
+  resetButton: {
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 8,
+  },
+  resetButtonText: {
+    color: '#000000',
+    fontWeight: 'bold',
   },
 });

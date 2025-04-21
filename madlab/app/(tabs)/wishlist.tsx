@@ -20,6 +20,7 @@ import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
 import { useAuth } from '@/contexts/AuthContext';
+import { useWishlist } from '@/contexts/WishlistContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.9;
@@ -37,11 +38,12 @@ export default function WishlistScreen() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [imageLoading, setImageLoading] = useState(false);
+  const { wishlistItems: wishlistIds, removeFromWishlist: removeFromWishlistContext } = useWishlist();
 
   useFocusEffect(
     useCallback(() => {
       fetchWishlistItems();
-    }, [])
+    }, [wishlistIds])
   );
 
   const fetchWishlistItems = async () => {
@@ -71,15 +73,8 @@ export default function WishlistScreen() {
 
   const removeFromWishlist = async (outfitId: string) => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      const { error } = await supabase
-        .from('wishlist')
-        .delete()
-        .eq('user_id', user?.id)
-        .eq('outfit_id', outfitId);
-
-      if (error) throw error;
-
+      await removeFromWishlistContext(outfitId);
+      
       setWishlistItems(prev => prev.filter(item => item.outfit_id !== outfitId));
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Toast.show({

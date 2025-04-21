@@ -16,7 +16,6 @@ export default function ProfileScreen() {
   const [isEditing, setIsEditing] = useState(false);
   const [tempUsername, setTempUsername] = useState('');
 
-
   useEffect(() => {
     loadProfile();
   }, []);
@@ -39,8 +38,6 @@ export default function ProfileScreen() {
       setLoading(false);
     }
   };
-
-
 
   const updateUsername = () => {
     setProfile(prev => prev ? { ...prev, username: tempUsername } : null);
@@ -89,9 +86,7 @@ export default function ProfileScreen() {
       <View style={styles.profileContainer}>
         <View style={styles.contentContainer}>
           <View style={styles.avatarContainer}>
-            <View style={styles.avatarPlaceholder}>
-              <IconSymbol name="person.crop.circle.fill" size={40} color="#666666" />
-            </View>
+            <IconSymbol name="person.crop.circle.fill" size={80} color="#666666" />
           </View>
 
           <View style={styles.infoContainer}>
@@ -144,11 +139,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
   },
   header: {
-    paddingTop: 60,
+    paddingTop: Platform.OS === 'ios' ? 60 : 40,
     paddingHorizontal: 20,
     paddingBottom: 20,
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    marginTop: Platform.OS === 'ios' ? 0 : 20,
   },
   headerTitle: {
     fontSize: 28,
@@ -170,14 +166,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 24,
-  },
-  avatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#F5F5F5',
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: '#FFFFFF',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
   infoContainer: {
     width: '100%',
