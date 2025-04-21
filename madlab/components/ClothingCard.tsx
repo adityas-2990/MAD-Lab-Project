@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, Image, View, Dimensions, TouchableOpacity } from 'react-native';
-import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { ThemedText } from '@/components/ThemedText';
@@ -12,6 +11,7 @@ import Animated, {
   withSequence,
   useAnimatedStyle,
 } from 'react-native-reanimated';
+import { useWishlist } from '@/contexts/WishlistContext';
 
 const { width } = Dimensions.get('window');
 
@@ -24,32 +24,13 @@ type Outfit = {
 };
 
 export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }: Outfit) {
-  const [isLiked, setIsLiked] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const scale = useSharedValue(1);
   const { session } = useAuth();
-
-  useEffect(() => {
-    checkIfLiked();
-  }, [outfit_id]);
-
-  const checkIfLiked = async () => {
-    if (!session?.user) return;
-
-    const { data, error } = await supabase
-      .from('wishlist')
-      .select('*')
-      .eq('user_id', session.user.id)
-      .eq('outfit_id', outfit_id)
-      .single();
-
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error checking wishlist:', error);
-      return;
-    }
-
-    setIsLiked(!!data);
-  };
+  const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
+  
+  // Use the isInWishlist function from the context to determine if the item is liked
+  const isLiked = isInWishlist(outfit_id);
 
   const animatePress = () => {
     scale.value = withSpring(0.95, { damping: 15, mass: 0.5 });
@@ -70,21 +51,12 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
     }
 
     setIsProcessing(true);
-
-    setIsLiked(prev => !prev);
     scale.value = withSequence(withSpring(1.2), withSpring(1));
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     try {
       if (!isLiked) {
-        const { error } = await supabase.from('wishlist').insert([
-          {
-            user_id: session.user.id,
-            outfit_id,
-          },
-        ]);
-        if (error) throw error;
-
+        await addToWishlist(outfit_id);
         Toast.show({
           type: 'success',
           text1: 'Added to wishlist',
@@ -93,14 +65,7 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
         });
         await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } else {
-        const { error } = await supabase
-          .from('wishlist')
-          .delete()
-          .eq('user_id', session.user.id)
-          .eq('outfit_id', outfit_id);
-
-        if (error) throw error;
-
+        await removeFromWishlist(outfit_id);
         Toast.show({
           type: 'success',
           text1: 'Removed from wishlist',
@@ -112,7 +77,6 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
       onWishlistUpdate?.();
     } catch (error) {
       console.error('Error toggling wishlist:', error);
-      setIsLiked(prev => !prev); // Revert
       Toast.show({
         type: 'error',
         text1: 'Failed to update wishlist',
@@ -146,9 +110,9 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
           disabled={isProcessing}
         >
           <IconSymbol
-            name={isLiked ? 'heart.fill' : 'heart'}
-            size={24}
-            color={isLiked ? '#FF3B30' : '#000000'}
+            name={isLiked ? 'heart.fill' : 'heart.circle'}
+            size={32}
+            color={isLiked ? '#FF3B30' : '#999999'}
           />
         </TouchableOpacity>
       </Animated.View>
@@ -192,16 +156,18 @@ const styles = StyleSheet.create({
     color: '#000000',
   },
   likeButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFFFFF',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#F8F8F8',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.2,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 5,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
   },
 });
