@@ -1,7 +1,17 @@
-import { StyleSheet, FlatList, View, Dimensions, Image, TouchableOpacity, Alert, Pressable, ActivityIndicator, Linking } from 'react-native';
-import { useEffect, useState, useCallback } from 'react';
-import { useFocusEffect, useRoute, ParamListBase } from '@react-navigation/native';
-import type { RouteProp } from '@react-navigation/native';
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  StyleSheet,
+  FlatList,
+  View,
+  Dimensions,
+  Image,
+  TouchableOpacity,
+  Alert,
+  Pressable,
+  ActivityIndicator,
+  Linking,
+} from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { supabase } from '@/lib/supabase';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
@@ -9,6 +19,7 @@ import { IconSymbol } from '@/components/ui/IconSymbol';
 import Toast from 'react-native-toast-message';
 import * as Haptics from 'expo-haptics';
 import Animated, { FadeInRight, FadeOutLeft } from 'react-native-reanimated';
+import { useAuth } from '@/contexts/AuthContext';
 
 const { width } = Dimensions.get('window');
 const CARD_WIDTH = width * 0.9;
@@ -22,42 +33,49 @@ type WishlistItem = {
   } | null;
 };
 
-type WishlistResponse = {
-  outfit_id: string;
-  outfits: {
-    image: string;
-    purchase_link: string;
-  } | null;
-}[];
-
 export default function WishlistScreen() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [imageLoading, setImageLoading] = useState(false);
 
-  const route = useRoute<RouteProp<ParamListBase & { params: { refresh?: number } }>>();
-  const params = route.params as { refresh?: number } | undefined;
-
-  // Refresh wishlist when the screen comes into focus or when refresh param changes
   useFocusEffect(
     useCallback(() => {
       fetchWishlistItems();
-    }, [params?.refresh])
+    }, [])
   );
 
-  useEffect(() => {
-    fetchWishlistItems();
-  }, []);
-
-  const removeFromWishlist = async (outfitId: string) => {
+  const fetchWishlistItems = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
+      const { data, error } = await supabase
+        .from('wishlist')
+        .select(`
+          outfit_id,
+          outfits (
+            image,
+            purchase_link
+          )
+        `)
+        .eq('user_id', user.id);
+
+      if (error) throw error;
+      setWishlistItems(data || []);
+    } catch (error) {
+      console.error('Error fetching wishlist:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const removeFromWishlist = async (outfitId: string) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
       const { error } = await supabase
         .from('wishlist')
         .delete()
-        .eq('user_id', user.id)
+        .eq('user_id', user?.id)
         .eq('outfit_id', outfitId);
 
       if (error) throw error;
@@ -87,38 +105,13 @@ export default function WishlistScreen() {
       'Are you sure you want to remove this item from your wishlist?',
       [
         { text: 'Cancel', style: 'cancel' },
-        { 
-          text: 'Remove', 
+        {
+          text: 'Remove',
           style: 'destructive',
-          onPress: () => removeFromWishlist(outfitId)
+          onPress: () => removeFromWishlist(outfitId),
         },
       ]
     );
-  };
-
-  const fetchWishlistItems = async () => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { data, error } = await supabase
-        .from('wishlist')
-        .select(`
-          outfit_id,
-          outfits (
-            image,
-            purchase_link
-          )
-        `)
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-      setWishlistItems(data || []);
-    } catch (error) {
-      console.error('Error fetching wishlist:', error);
-    } finally {
-      setLoading(false);
-    }
   };
 
   if (loading) {
@@ -148,24 +141,28 @@ export default function WishlistScreen() {
     <ThemedView style={styles.container}>
       <View style={styles.header}>
         <ThemedText type="title" style={styles.title}>My Wishlist</ThemedText>
-        <ThemedText style={styles.subtitle}>{wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} saved</ThemedText>
+        <ThemedText style={styles.subtitle}>
+          {wishlistItems.length} {wishlistItems.length === 1 ? 'item' : 'items'} saved
+        </ThemedText>
       </View>
       <FlatList
         data={wishlistItems}
         keyExtractor={(item) => item.outfit_id}
         renderItem={({ item }) => (
-          <Animated.View 
-            entering={FadeInRight.duration(300)} 
+          <Animated.View
+            entering={FadeInRight.duration(300)}
             exiting={FadeOutLeft.duration(200)}
             style={styles.cardContainer}
           >
             {item.outfits && (
-              <Pressable 
-                style={({ pressed }) => [{
-                  opacity: pressed ? 0.9 : 1,
-                  transform: [{ scale: pressed ? 0.98 : 1 }],
-                  width: '100%',
-                }]}
+              <Pressable
+                style={({ pressed }) => [
+                  {
+                    opacity: pressed ? 0.9 : 1,
+                    transform: [{ scale: pressed ? 0.98 : 1 }],
+                    width: '100%',
+                  },
+                ]}
               >
                 <View style={styles.card}>
                   <Image 
@@ -259,6 +256,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     width: '100%',
   },
+  card: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    borderRadius: 20,
+    backgroundColor: '#1A1A1A',
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  cardImage: {
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
+    resizeMode: 'cover',
+    borderRadius: 20,
+  },
   cardOverlay: {
     position: 'absolute',
     bottom: 0,
@@ -292,27 +310,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#FFFFFF',
   },
-  card: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    borderRadius: 20,
-    backgroundColor: '#1A1A1A',
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  cardImage: {
-    width: CARD_WIDTH,
-    height: CARD_HEIGHT,
-    resizeMode: 'cover',
-    borderRadius: 20,
-  },
   emptyState: {
     flex: 1,
     justifyContent: 'center',
@@ -331,4 +328,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 24,
   },
-}); 
+});
