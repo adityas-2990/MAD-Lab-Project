@@ -1,16 +1,39 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StyleSheet, View, ScrollView, TouchableOpacity } from 'react-native';
 import { ThemedText } from '@/components/ThemedText';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 
-const filters = [
-  { icon: 'person', label: 'Gender' },
-  { icon: 'dollarsign', label: 'Price' },
-  { icon: 'ruler', label: 'Size' },
-  { icon: 'paintbrush', label: 'Color' },
+type GenderFilter = 'Men' | 'Women' | 'Unisex';
+
+type FilterOption = {
+  icon: string;
+  label: string;
+  type: 'gender' | 'price' | 'size' | 'color';
+};
+
+const filters: FilterOption[] = [
+  { icon: 'person', label: 'Gender', type: 'gender' },
+  { icon: 'dollarsign', label: 'Price', type: 'price' },
+  { icon: 'ruler', label: 'Size', type: 'size' },
+  { icon: 'paintbrush', label: 'Color', type: 'color' },
 ];
 
-export function FilterBar() {
+type FilterBarProps = {
+  onGenderFilter: (genders: GenderFilter[]) => void;
+};
+
+export function FilterBar({ onGenderFilter }: FilterBarProps) {
+  const [showGenderModal, setShowGenderModal] = useState(false);
+  const [selectedGenders, setSelectedGenders] = useState<GenderFilter[]>([]);
+
+  const handleGenderSelect = (gender: GenderFilter) => {
+    const newSelection = selectedGenders.includes(gender)
+      ? selectedGenders.filter((g: GenderFilter) => g !== gender)
+      : [...selectedGenders, gender];
+    
+    setSelectedGenders(newSelection);
+    onGenderFilter(newSelection);
+  };
   return (
     <View style={styles.container}>
       <TouchableOpacity style={styles.filterButton}>
@@ -24,15 +47,52 @@ export function FilterBar() {
         {filters.map((filter) => (
           <TouchableOpacity 
             key={filter.label} 
-            style={styles.filterOption}
+            style={[styles.filterOption, filter.type === 'gender' && selectedGenders.length > 0 && styles.activeFilter]}
+            onPress={() => filter.type === 'gender' && setShowGenderModal(true)}
           >
             <IconSymbol name={filter.icon} size={16} color="#000000" style={styles.filterIcon} />
             <ThemedText style={styles.filterText}>{filter.label}</ThemedText>
-
+            {filter.type === 'gender' && selectedGenders.length > 0 && (
+              <View style={styles.badge}>
+                <ThemedText style={styles.badgeText}>{selectedGenders.length}</ThemedText>
+              </View>
+            )}
           </TouchableOpacity>
         ))}
       </ScrollView>
 
+      {showGenderModal && (
+        <TouchableOpacity 
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowGenderModal(false)}
+        >
+          <View style={styles.modal}>
+            <View style={styles.modalHandle} />
+            <ThemedText style={styles.modalTitle}>Filter by Gender</ThemedText>
+            {['Men', 'Women', 'Unisex'].map((gender) => (
+              <TouchableOpacity 
+                key={gender} 
+                style={styles.modalOption}
+                onPress={() => handleGenderSelect(gender as GenderFilter)}
+              >
+                <View style={[styles.checkbox, selectedGenders.includes(gender as GenderFilter) && styles.checkboxSelected]}>
+                  {selectedGenders.includes(gender as GenderFilter) && (
+                    <IconSymbol name="checkmark" size={16} color="#FFFFFF" />
+                  )}
+                </View>
+                <ThemedText style={styles.modalOptionText}>{gender}</ThemedText>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity 
+              style={styles.modalCloseButton}
+              onPress={() => setShowGenderModal(false)}
+            >
+              <ThemedText style={styles.modalCloseText}>Apply</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
@@ -52,11 +112,10 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.75)',
-    justifyContent: 'flex-start',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    paddingTop: 120, // Add padding from top to move modal down
     alignItems: 'center',
-    paddingTop: 80,
-    zIndex: 9999,
+    zIndex: 1000,
   },
   modal: {
     backgroundColor: '#FFFFFF',
@@ -64,18 +123,17 @@ const styles = StyleSheet.create({
     padding: 20,
     width: '90%',
     maxWidth: 400,
-    elevation: 20,
+    elevation: 5,
     shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.35,
-    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
   },
   modalTitle: {
     fontSize: 20,
     fontWeight: '600',
     marginBottom: 24,
     textAlign: 'center',
-    color: '#000000',
   },
   modalOption: {
     flexDirection: 'row',
@@ -98,7 +156,6 @@ const styles = StyleSheet.create({
   },
   modalOptionText: {
     fontSize: 16,
-    color: '#000000',
   },
   modalCloseButton: {
     marginTop: 24,

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
+import { StyleSheet, View, TouchableOpacity, TextInput, ActivityIndicator, Platform } from 'react-native';
 import { ThemedView } from '@/components/ThemedView';
 import { ThemedText } from '@/components/ThemedText';
 import { supabase } from '@/lib/supabase';
@@ -11,65 +11,156 @@ type Profile = {
 };
 
 export default function ProfileScreen() {
-  const handleSignOut = () => {
-    // Handle sign out logic here
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [isEditing, setIsEditing] = useState(false);
+  const [tempUsername, setTempUsername] = useState('');
+
+
+  useEffect(() => {
+    loadProfile();
+  }, []);
+
+  const loadProfile = async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      setProfile({
+        username: user.email?.split('@')[0] || 'User',
+        email: user.email || '',
+      });
+    } catch (error) {
+      console.error('Error loading profile:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
+
+
+  const updateUsername = () => {
+    setProfile(prev => prev ? { ...prev, username: tempUsername } : null);
+    setIsEditing(false);
+  };
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setProfile(null);
+  };
+
+  if (loading) {
+    return (
+      <ThemedView style={styles.container}>
+        <ActivityIndicator size="large" color="#000000" />
+      </ThemedView>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <ThemedView style={styles.container}>
+        <View style={styles.authContainer}>
+          <ThemedText style={styles.title}>Welcome Back!</ThemedText>
+          <TouchableOpacity
+            style={styles.authButton}
+            onPress={() => supabase.auth.signInWithOAuth({
+              provider: 'google',
+              options: { redirectTo: 'yourapp://auth/callback' }
+            })}
+          >
+            <IconSymbol name="person.crop.circle" size={24} color="#FFFFFF" style={styles.buttonIcon} />
+            <ThemedText style={styles.buttonText}>Continue with Google</ThemedText>
+          </TouchableOpacity>
+        </View>
+      </ThemedView>
+    );
+  }
+
   return (
-    <View style={styles.container}>
+    <ThemedView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-          <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color="#000" />
-          <ThemedText style={styles.signOutText}>Sign Out</ThemedText>
-        </TouchableOpacity>
+        <ThemedText style={styles.headerTitle}>Profile</ThemedText>
       </View>
-      
-      <View style={styles.content}>
-        <ThemedText style={styles.title}>Profile</ThemedText>
-        {/* Add other profile content here */}
+
+      <View style={styles.profileContainer}>
+        <View style={styles.contentContainer}>
+          <View style={styles.avatarContainer}>
+            <View style={styles.avatarPlaceholder}>
+              <IconSymbol name="person.crop.circle.fill" size={40} color="#666666" />
+            </View>
+          </View>
+
+          <View style={styles.infoContainer}>
+            {isEditing ? (
+              <View style={styles.editContainer}>
+                <TextInput
+                  style={styles.input}
+                  value={tempUsername}
+                  onChangeText={setTempUsername}
+                  placeholder="Enter username"
+                  autoFocus
+                />
+                <TouchableOpacity style={styles.saveButton} onPress={updateUsername}>
+                  <ThemedText style={styles.saveButtonText}>Save</ThemedText>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.usernameContainer}
+                onPress={() => {
+                  setTempUsername(profile.username);
+                  setIsEditing(true);
+                }}
+              >
+                <ThemedText style={styles.username}>{profile.username}</ThemedText>
+                <IconSymbol name="pencil" size={16} color="#666666" />
+              </TouchableOpacity>
+            )}
+            <ThemedText style={styles.email}>{profile.email}</ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.signOutContainer}>
+          <TouchableOpacity 
+            style={styles.signOutButton} 
+            onPress={handleSignOut}
+          >
+            <IconSymbol name="rectangle.portrait.and.arrow.right" size={20} color="#FF3B30" />
+            <ThemedText style={styles.signOutText}>Sign Out</ThemedText>
+          </TouchableOpacity>
+        </View>
       </View>
-    </View>
+    </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#FFFFFF',
   },
   header: {
     paddingTop: 60,
     paddingHorizontal: 20,
-    paddingBottom: 10,
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
+    paddingBottom: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
-  signOutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 8,
-    borderRadius: 8,
-    backgroundColor: '#f5f5f5',
-  },
-  signOutText: {
-    marginLeft: 8,
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#000',
-  },
-  content: {
-    paddingTop: 10,
-    paddingHorizontal: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#000',
+  headerTitle: {
+    fontSize: 28,
+    fontWeight: '700',
+    color: '#000000',
   },
   profileContainer: {
     flex: 1,
-    alignItems: 'center',
     paddingTop: 32,
+  },
+  contentContainer: {
+    alignItems: 'center',
   },
   avatarContainer: {
     width: 120,
@@ -133,12 +224,28 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontWeight: '600',
   },
+  signOutContainer: {
+    width: '100%',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginTop: 60,
+  },
   signOutButton: {
-    position: 'absolute',
-    bottom: 40,
     flexDirection: 'row',
     alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 24,
     gap: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   signOutText: {
     color: '#FF3B30',

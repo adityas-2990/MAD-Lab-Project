@@ -71,7 +71,6 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
 
     setIsProcessing(true);
 
-    // Optimistic update
     setIsLiked(prev => !prev);
     scale.value = withSequence(withSpring(1.2), withSpring(1));
     await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
