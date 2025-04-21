@@ -1,20 +1,41 @@
-import React, { useEffect, useState } from 'react';
-import { StyleSheet, Dimensions, Image, ActivityIndicator, View } from 'react-native';
+import React, { useEffect, useState, useCallback } from 'react';
+import { StyleSheet, Dimensions, ActivityIndicator, View, StatusBar } from 'react-native';
 import Swiper from 'react-native-deck-swiper';
 import { ThemedView } from '@/components/ThemedView';
+import { FilterBar } from '@/components/FilterBar';
 import { ThemedText } from '@/components/ThemedText';
 import { supabase } from '@/lib/supabase';
+import { useNavigation, ParamListBase } from '@react-navigation/native';
+import type { NavigationProp } from '@react-navigation/native';
+import { ClothingCard } from '@/components/ClothingCard';
 
 const { width } = Dimensions.get('window');
 
 type Outfit = {
   outfit_id: string;
   image: string;
+  name: string;
+  price: number;
+  gender: 'Men' | 'Women' | 'Unisex';
 };
 
 export default function HomeScreen() {
+  const [visibleIndex, setVisibleIndex] = useState(0);
+  const navigation = useNavigation<NavigationProp<ParamListBase & { params: { refresh?: number } }>>();
   const [outfits, setOutfits] = useState<Outfit[]>([]);
+  const [filteredOutfits, setFilteredOutfits] = useState<Outfit[]>([]);
+  const [selectedGenders, setSelectedGenders] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const handleGenderFilter = (genders: string[]) => {
+    setSelectedGenders(genders);
+    if (genders.length === 0) {
+      setFilteredOutfits(outfits);
+    } else {
+      const filtered = outfits.filter(outfit => genders.includes(outfit.gender));
+      setFilteredOutfits(filtered);
+    }
+  };
 
   useEffect(() => {
     loadOutfits();
@@ -25,9 +46,9 @@ export default function HomeScreen() {
       console.log('Starting to fetch outfits...');
       let { data: outfits, error } = await supabase
         .from('outfits')
-        .select('outfit_id, image');
+        .select('outfit_id, image, name, price, gender');
 
-      console.log('Supabase response:', { data: outfits, error }); // More detailed debug log
+      console.log('Supabase response:', { data: outfits, error });
 
       if (error) {
         console.error('Supabase error:', error);
@@ -40,8 +61,9 @@ export default function HomeScreen() {
         return;
       }
 
-      console.log('Setting outfits:', outfits); // Log the outfits being set
+      console.log('Setting outfits:', outfits);
       setOutfits(outfits);
+      setFilteredOutfits(outfits);
     } catch (error) {
       console.error('Error loading outfits:', error);
     } finally {
@@ -67,64 +89,78 @@ export default function HomeScreen() {
 
   return (
     <ThemedView style={styles.container}>
-      <Swiper
-        cards={outfits}
-        renderCard={(outfit) => {
-          if (!outfit) return null;
-          return (
-            <View style={styles.card}>
-              <Image source={{ uri: outfit.image }} style={styles.image} />
-            </View>
-          );
-        }}
-        onSwipedLeft={(cardIndex) => {
-          console.log('Swiped left:', cardIndex);
-        }}
-        onSwipedRight={(cardIndex) => {
-          console.log('Swiped right:', cardIndex);
-        }}
-        onSwipedAll={() => {
-          console.log('All outfits swiped');
-          loadOutfits();
-        }}
-        cardIndex={0}
-        backgroundColor="#000000"
-        stackSize={3}
-        stackSeparation={15}
-        animateCardOpacity
-        verticalSwipe={false}
-        cardVerticalMargin={80}
-        cardHorizontalMargin={20}
-      />
+      <StatusBar barStyle="light-content" />
+      <View style={styles.header}>
+        <FilterBar onGenderFilter={handleGenderFilter} />
+      </View>
+      <View style={styles.swiperContainer}>
+        <Swiper
+          cards={filteredOutfits}
+          renderCard={(outfit, cardIndex) => {
+            if (!outfit) {
+              return (
+                <View style={styles.placeholderCard}>
+                  <ActivityIndicator size="large" color="#000000" />
+                </View>
+              );
+            }
+            return (
+              <ClothingCard
+                key={outfit.outfit_id}
+                outfit_id={outfit.outfit_id}
+                image={outfit.image}
+                name={outfit.name}
+                price={outfit.price}
+                onWishlistUpdate={() => navigation.setParams({ refresh: Date.now() })}
+              />
+            );
+          }}
+          onSwipedLeft={(cardIndex) => setVisibleIndex(cardIndex + 1)}
+          onSwipedRight={(cardIndex) => setVisibleIndex(cardIndex + 1)}
+          onSwipedAll={() => {
+            setVisibleIndex(0);
+            loadOutfits();
+          }}
+          cardIndex={0}
+          backgroundColor="transparent"
+          stackSize={2}
+          containerStyle={styles.swiperContent}
+          stackSeparation={15}
+          animateCardOpacity
+          verticalSwipe={false}
+          cardVerticalMargin={80}
+          cardHorizontalMargin={20}
+          disableTopSwipe
+          disableBottomSwipe
+          outputRotationRange={["-8deg", "0deg", "8deg"]}
+          useViewOverflow={false}
+        />
+      </View>
     </ThemedView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  swiperContainer: {
     flex: 1,
-    backgroundColor: '#000000',
     justifyContent: 'center',
   },
-  card: {
+  swiperContent: {
+    marginTop: -60,
+  },
+  container: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+  },
+  header: {
+    paddingTop: 60,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  placeholderCard: {
     width: width * 0.9,
     height: width * 1.2,
-    borderRadius: 20,
-    backgroundColor: '#1A1A1A',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
-    overflow: 'hidden',
-  },
-  image: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
+    backgroundColor: 'transparent',
   },
   text: {
     fontSize: 16,
