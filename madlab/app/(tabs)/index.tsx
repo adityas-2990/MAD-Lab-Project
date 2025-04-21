@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase';
 import { useNavigation, ParamListBase } from '@react-navigation/native';
 import type { NavigationProp } from '@react-navigation/native';
 import { ClothingCard } from '@/components/ClothingCard';
+import { IconSymbol } from '@/components/ui/IconSymbol';
 
 const { width } = Dimensions.get('window');
 
@@ -56,23 +57,23 @@ export default function HomeScreen() {
   };
 
   const handleGenderFilter = (genders: ('Men' | 'Women' | 'Unisex')[]) => {
+    console.log('Gender filter changed:', genders);
     setSelectedGenders(genders);
-    applyFilters(genders, selectedPrices, selectedCategories, selectedColors);
   };
 
   const handlePriceFilter = (prices: PriceFilter[]) => {
+    console.log('Price filter changed:', prices);
     setSelectedPrices(prices);
-    applyFilters(selectedGenders, prices, selectedCategories, selectedColors);
   };
 
   const handleCategoryFilter = (categories: CategoryFilter[]) => {
+    console.log('Category filter changed:', categories);
     setSelectedCategories(categories);
-    applyFilters(selectedGenders, selectedPrices, categories, selectedColors);
   };
 
   const handleColorFilter = (colors: ColorFilter[]) => {
+    console.log('Color filter changed:', colors);
     setSelectedColors(colors);
-    applyFilters(selectedGenders, selectedPrices, selectedCategories, colors);
   };
 
   const applyFilters = (
@@ -81,6 +82,8 @@ export default function HomeScreen() {
     categories: CategoryFilter[],
     colors: ColorFilter[]
   ) => {
+    console.log('Applying filters:', { genders, prices, categories, colors });
+    
     // If all filters are empty, show all outfits
     if (genders.length === 0 && prices.length === 0 && categories.length === 0 && colors.length === 0) {
       console.log('All filters cleared, showing all outfits');
@@ -132,6 +135,13 @@ export default function HomeScreen() {
     console.log('Filtered outfits:', filtered.length);
     setFilteredOutfits(filtered);
   };
+
+  // Add a useEffect to handle filter changes
+  useEffect(() => {
+    if (outfits.length > 0) {
+      applyFilters(selectedGenders, selectedPrices, selectedCategories, selectedColors);
+    }
+  }, [selectedGenders, selectedPrices, selectedCategories, selectedColors, outfits]);
 
   useEffect(() => {
     loadOutfits();
@@ -210,6 +220,12 @@ export default function HomeScreen() {
       <View style={styles.swiperContainer}>
         {filteredOutfits.length === 0 ? (
           <View style={styles.noOutfitsContainer}>
+            <IconSymbol 
+              name="magnifyingglass" 
+              size={60} 
+              color="#000000" 
+              style={styles.noOutfitsIcon}
+            />
             <ThemedText style={styles.noOutfitsText}>No outfits found matching your filters</ThemedText>
             <TouchableOpacity 
               style={styles.resetButton}
@@ -220,6 +236,12 @@ export default function HomeScreen() {
           </View>
         ) : allOutfitsSwiped ? (
           <View style={styles.noOutfitsContainer}>
+            <IconSymbol 
+              name="tshirt.fill" 
+              size={60} 
+              color="#000000" 
+              style={styles.noOutfitsIcon}
+            />
             <ThemedText style={styles.noOutfitsText}>No more outfits left</ThemedText>
             <TouchableOpacity 
               style={styles.resetButton}
@@ -311,11 +333,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 20,
   },
+  noOutfitsIcon: {
+    marginBottom: 20,
+  },
   noOutfitsText: {
     fontSize: 18,
     textAlign: 'center',
     marginBottom: 20,
-    color: '#FFFFFF',
+    color: '#000000',
   },
   resetButton: {
     backgroundColor: '#FFFFFF',
