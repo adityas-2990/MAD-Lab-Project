@@ -66,7 +66,6 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
     if (isProcessing) return;
     setIsProcessing(true);
     
-    // Optimistically update UI
     setIsLiked(prev => !prev);
     scale.value = withSequence(
       withSpring(1.2),

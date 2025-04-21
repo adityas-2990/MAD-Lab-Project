@@ -1,4 +1,4 @@
-import { StyleSheet, FlatList, View, Dimensions, Image, TouchableOpacity, Alert, Pressable } from 'react-native';
+import { StyleSheet, FlatList, View, Dimensions, Image, TouchableOpacity, Alert, Pressable, ActivityIndicator, Linking } from 'react-native';
 import { useEffect, useState, useCallback } from 'react';
 import { useFocusEffect, useRoute, ParamListBase } from '@react-navigation/native';
 import type { RouteProp } from '@react-navigation/native';
@@ -18,7 +18,7 @@ type WishlistItem = {
   outfit_id: string;
   outfits: {
     image: string;
-    outfit_id: string;
+    purchase_link: string;
   } | null;
 };
 
@@ -26,13 +26,14 @@ type WishlistResponse = {
   outfit_id: string;
   outfits: {
     image: string;
-    outfit_id: string;
+    purchase_link: string;
   } | null;
 }[];
 
 export default function WishlistScreen() {
   const [wishlistItems, setWishlistItems] = useState<WishlistItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [imageLoading, setImageLoading] = useState(false);
 
   const route = useRoute<RouteProp<ParamListBase & { params: { refresh?: number } }>>();
   const params = route.params as { refresh?: number } | undefined;
@@ -106,7 +107,7 @@ export default function WishlistScreen() {
           outfit_id,
           outfits (
             image,
-            outfit_id
+            purchase_link
           )
         `)
         .eq('user_id', user.id);
@@ -123,7 +124,10 @@ export default function WishlistScreen() {
   if (loading) {
     return (
       <ThemedView style={styles.container}>
-        <ThemedText>Loading...</ThemedText>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#000000" />
+          <ThemedText style={{ marginTop: 16 }}>Loading your wishlist...</ThemedText>
+        </View>
       </ThemedView>
     );
   }
@@ -163,17 +167,46 @@ export default function WishlistScreen() {
                   width: '100%',
                 }]}
               >
-                <Image 
-                  source={{ uri: item.outfits.image }} 
-                  style={styles.cardImage} 
-                />
+                <View style={styles.card}>
+                  <Image 
+                    source={{ uri: item.outfits.image }} 
+                    style={styles.cardImage}
+                    onError={() => {
+                      Toast.show({
+                        type: 'error',
+                        text1: 'Failed to load image',
+                        position: 'bottom',
+                        bottomOffset: 80,
+                      });
+                    }}
+                    onLoadStart={() => setImageLoading(true)}
+                    onLoadEnd={() => setImageLoading(false)}
+                  />
+                  {imageLoading && (
+                    <View style={styles.loadingContainer}>
+                      <ActivityIndicator size="large" color="#000000" />
+                    </View>
+                  )}
+                </View>
                 <View style={styles.cardOverlay}>
-                  <TouchableOpacity 
-                    style={styles.removeButton} 
-                    onPress={() => handleRemove(item.outfit_id)}
-                  >
-                    <ThemedText style={styles.removeButtonText}>Remove</ThemedText>
-                  </TouchableOpacity>
+                  <View style={styles.buttonContainer}>
+                    <TouchableOpacity 
+                      style={styles.buyButton}
+                      onPress={() => {
+                        if (item.outfits?.purchase_link) {
+                          Linking.openURL(item.outfits.purchase_link);
+                        }
+                      }}
+                    >
+                      <ThemedText style={styles.buttonText}>Buy Now</ThemedText>
+                    </TouchableOpacity>
+                    <TouchableOpacity 
+                      style={styles.removeButton} 
+                      onPress={() => handleRemove(item.outfit_id)}
+                    >
+                      <ThemedText style={styles.buttonText}>Remove</ThemedText>
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </Pressable>
             )}
@@ -187,6 +220,17 @@ export default function WishlistScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 20,
+  },
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -226,14 +270,24 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.2)',
     borderRadius: 20,
   },
+  buttonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 12,
+  },
+  buyButton: {
+    backgroundColor: 'rgba(0, 122, 255, 0.9)',
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+    borderRadius: 12,
+  },
   removeButton: {
     backgroundColor: 'rgba(255, 55, 95, 0.9)',
     paddingVertical: 10,
     paddingHorizontal: 20,
     borderRadius: 12,
-    alignSelf: 'flex-end',
   },
-  removeButtonText: {
+  buttonText: {
     fontSize: 14,
     fontWeight: '600',
     color: '#FFFFFF',
@@ -247,16 +301,17 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 8,
+      height: 4,
     },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 10,
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
   },
   cardImage: {
-    width: '100%',
-    height: '100%',
+    width: CARD_WIDTH,
+    height: CARD_HEIGHT,
     resizeMode: 'cover',
+    borderRadius: 20,
   },
   emptyState: {
     flex: 1,
