@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Image, View, Dimensions, TouchableOpacity } from 'react-native';
+import { StyleSheet, Image, View, Dimensions, TouchableOpacity, Modal, Pressable, ScrollView } from 'react-native';
 import { useAuth } from '@/contexts/AuthContext';
 import { IconSymbol } from '@/components/ui/IconSymbol';
 import { ThemedText } from '@/components/ThemedText';
@@ -20,11 +20,13 @@ type Outfit = {
   image: string;
   name: string;
   price: number;
+  description?: string;
   onWishlistUpdate?: () => void;
 };
 
-export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }: Outfit) {
+export function ClothingCard({ outfit_id, image, name, price, description, onWishlistUpdate }: Outfit) {
   const [isProcessing, setIsProcessing] = useState(false);
+  const [showDescription, setShowDescription] = useState(false);
   const scale = useSharedValue(1);
   const { session } = useAuth();
   const { isInWishlist, addToWishlist, removeFromWishlist } = useWishlist();
@@ -94,29 +96,72 @@ export function ClothingCard({ outfit_id, image, name, price, onWishlistUpdate }
     };
   });
 
+  const handleCardPress = () => {
+    setShowDescription(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+  };
+
   return (
-    <View style={styles.card}>
-      <View style={styles.header}>
-        <ThemedText style={styles.productTitle} numberOfLines={1}>
-          {name}
-        </ThemedText>
-        <ThemedText style={styles.productPrice}>₹{price.toFixed(2)}</ThemedText>
-      </View>
-      <Image source={{ uri: image }} style={styles.image} />
-      <Animated.View style={[styles.buttonContainer, animatedStyle]}>
-        <TouchableOpacity
-          style={styles.likeButton}
-          onPress={toggleLike}
-          disabled={isProcessing}
-        >
-          <IconSymbol
-            name={isLiked ? 'heart.fill' : 'heart.circle'}
-            size={32}
-            color={isLiked ? '#FF3B30' : '#999999'}
-          />
-        </TouchableOpacity>
-      </Animated.View>
-    </View>
+    <>
+      <Pressable onPress={handleCardPress}>
+        <View style={styles.card}>
+          <View style={styles.header}>
+            <ThemedText style={styles.productTitle} numberOfLines={1}>
+              {name}
+            </ThemedText>
+            <ThemedText style={styles.productPrice}>₹{price.toFixed(2)}</ThemedText>
+          </View>
+          <Image source={{ uri: image }} style={styles.image} />
+          <Animated.View style={[styles.buttonContainer, animatedStyle]}>
+            <TouchableOpacity
+              style={styles.likeButton}
+              onPress={toggleLike}
+              disabled={isProcessing}
+            >
+              <IconSymbol
+                name={isLiked ? 'heart.fill' : 'heart.circle'}
+                size={32}
+                color={isLiked ? '#FF3B30' : '#999999'}
+              />
+            </TouchableOpacity>
+          </Animated.View>
+        </View>
+      </Pressable>
+
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={showDescription}
+        onRequestClose={() => setShowDescription(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <ThemedText style={styles.modalTitle}>{name}</ThemedText>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowDescription(false)}
+              >
+                <IconSymbol name="xmark.circle.fill" size={24} color="#000000" />
+              </TouchableOpacity>
+            </View>
+            <ScrollView 
+              style={styles.modalScrollView}
+              showsVerticalScrollIndicator={true}
+              contentContainerStyle={styles.modalScrollContent}
+            >
+              <Image source={{ uri: image }} style={styles.modalImage} />
+              <View style={styles.modalDetails}>
+                <ThemedText style={styles.modalPrice}>₹{price.toFixed(2)}</ThemedText>
+                {description && (
+                  <ThemedText style={styles.modalDescription}>{description}</ThemedText>
+                )}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </>
   );
 }
 
@@ -169,5 +214,59 @@ const styles = StyleSheet.create({
     elevation: 5,
     borderWidth: 1,
     borderColor: '#E0E0E0',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: width * 0.9,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 20,
+    maxHeight: '80%',
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  modalTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#000000',
+    flex: 1,
+  },
+  closeButton: {
+    padding: 4,
+  },
+  modalScrollView: {
+    maxHeight: '100%',
+  },
+  modalScrollContent: {
+    padding: 20,
+  },
+  modalImage: {
+    width: '100%',
+    height: width * 0.8,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  modalDetails: {
+    gap: 12,
+  },
+  modalPrice: {
+    fontSize: 20,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  modalDescription: {
+    fontSize: 16,
+    color: '#666666',
+    lineHeight: 24,
   },
 });
