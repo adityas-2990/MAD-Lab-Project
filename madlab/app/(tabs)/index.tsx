@@ -20,6 +20,7 @@ type Outfit = {
   category: 'Shirt' | 'T-Shirt' | 'Pants' | 'Jeans' | 'Dress' | 'Jacket' | 'Sweater' | 'Skirt' | 'Shorts' | 'Hoodie';
   color: 'Black' | 'White' | 'Red' | 'Blue' | 'Green' | 'Yellow' | 'Purple' | 'Pink';
   imageUrl: string;
+  description?: string;
 };
 
 type PriceFilter = 'Under ₹1000' | '₹1000-₹2000' | '₹2000-₹4000' | '₹4000-₹6000' | '₹6000-₹8000' | 'Over ₹8000';
@@ -152,7 +153,7 @@ export default function HomeScreen() {
       console.log('Starting to fetch outfits...');
       let { data: outfits, error } = await supabase
         .from('outfits')
-        .select('outfit_id, image, name, price, gender, category, color');
+        .select('outfit_id, image, name, price, gender, category, color, description');
 
       console.log('Supabase response:', { data: outfits, error });
 
@@ -176,7 +177,8 @@ export default function HomeScreen() {
         price: outfit.price,
         gender: outfit.gender,
         category: outfit.category,
-        color: outfit.color
+        color: outfit.color,
+        description: outfit.description
       }));
 
       console.log('Setting outfits:', transformedOutfits);
@@ -271,6 +273,7 @@ export default function HomeScreen() {
                   image={outfit.imageUrl}
                   name={outfit.name}
                   price={outfit.price}
+                  description={outfit.description}
                   onWishlistUpdate={() => navigation.setParams({ refresh: Date.now() })}
                 />
               );
